@@ -10,8 +10,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-cfg-if = "0.1.2"
-worker = "0.0.13"
+cfg-if = "1.0.0"
+worker = "0.0.15"
 serde_json = "1.0.67"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
@@ -19,7 +19,12 @@ serde_json = "1.0.67"
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.1", optional = true }
+futures-util = "0.3.27"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[dev-dependencies]
+futures-util = "0.3.27"
+reqwest = { version = "0.11.15", features = ["stream", "blocking", "json", "multipart"] }

@@ -1,8 +1,7 @@
 use serde_json::json;
 use worker::*;
-
+use futures_util::{StreamExt};
 mod utils;
-
 fn log_request(req: &Request) {
     console_log!(
         "{} - [{}], located at: {:?}, within: {}",
@@ -49,6 +48,42 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .get("/worker-version", |_, ctx| {
             let version = ctx.var("WORKERS_RS_VERSION")?.to_string();
             Response::ok(version)
+        })
+        .get("/websocket", |_, ctx| {
+            // Accept / handle a websocket connection
+            let pair = WebSocketPair::new()?;
+            let server = pair.server;
+            server.accept()?;
+            server.send_with_str("Hello from Workers!")?;
+            // let some_namespace_kv = ctx.kv("SOME_NAMESPACE")?;
+
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut event_stream = server.events().expect("could not open stream");
+
+                while let Some(event) = event_stream.next().await {
+                    match event.expect("received error in websocket") {
+                        WebsocketEvent::Message(msg) => {
+                            if let Some(text) = msg.text() {
+                                console_log!("{:#?}", msg);
+                                server.send_with_str(text).expect("could not relay text");
+                            }
+                        }
+                        WebsocketEvent::Close(_) => {
+                            // Sets a key in a test KV so the integration tests can query if we
+                            // actually got the close event. We can't use the shared dat a for this
+                            // because miniflare resets that every request.
+                            // some_namespace_kv
+                            //     .put("got-close-event", "true")
+                            //     .unwrap()
+                            //     .execute()
+                            //     .await
+                            //     .unwrap();
+                        }
+                    }
+                }
+            });
+
+            Response::from_websocket(pair.client)
         })
         .run(req, env)
         .await
